@@ -8,6 +8,7 @@
 #include "bmpDistortion.h"
 #include <string.h>
 #include <math.h>
+#include <stdlib.h>
 
 int bmpDistortion() {
     char fileName1[129] = {0};
@@ -64,16 +65,38 @@ int bmpDistortion() {
     
     sBmpHeader header;
     sBmpHeader modifiedHeader;
-    fread(&header, sizeof(header), 1, pFile);
     
     //deal with tan(0)
-    
+    if(angle == 0){
+        uint8_t* row_modified = NULL;
+        int32_t col_modified = 0;
+            
+        fread(&header,sizeof(sBmpHeader),1,pFile);
+        header.width *= 2;
+        header.height = 1;
+        fwrite(&header,sizeof(sBmpHeader),1,pFile2);
+
+        col_modified = header.width * 3 + header.width % 4;
+        row_modified = (uint8_t*)malloc(sizeof(uint8_t) * col_modified);
+        for(int32_t i = 0;i < col_modified;i++) row_modified[i] = 0; //all black
+
+        fwrite(row_modified,1,col_modified,pFile2);
+        return 1;
+    }
+
+    fread(&header, sizeof(header), 1, pFile);
     
     //update new header data
     modifiedHeader = header;
-    modifiedHeader.width += (int)(header.height/tan(angle*M_PI/180));
-    modifiedHeader.bitmap_size = (int)modifiedHeader.height*modifiedHeader.width*(modifiedHeader.bpp/8);
-    modifiedHeader.size = modifiedHeader.bitmap_size+54;
+    
+    //deal with tan(90)
+    if(angle == 90) {
+        //just copy lah :)
+    } else {
+        modifiedHeader.width += (int)(header.height/tan(angle*M_PI/180));
+        modifiedHeader.bitmap_size = (int)modifiedHeader.height*modifiedHeader.width*(modifiedHeader.bpp/8);
+        modifiedHeader.size = modifiedHeader.bitmap_size+54;
+    }
     
     fwrite(&modifiedHeader, sizeof(modifiedHeader), 1, pFile2);
     
@@ -85,7 +108,13 @@ int bmpDistortion() {
     int height = 0;
     while(!feof(pFile)) {
         fread(colBuffOri, oriRowByteLen, 1, pFile);
-        int offset = (int)(height/(tan(angle*M_PI/180))*(modifiedHeader.bpp/8));
+        int offset = 0;
+        if(angle == 90) {
+            offset = 0;
+        } else {
+            offset = (int)(height/(tan(angle*M_PI/180))*(modifiedHeader.bpp/8));
+        }
+    
         //set everything to 255(white)
         for(size_t j = 0; j < newRowByteLen; j++) {
             colBuffModified[j] = 255;
